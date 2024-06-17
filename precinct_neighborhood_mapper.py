@@ -82,7 +82,12 @@ precinct_data = [
     {'Precinct': '120', 'Borough': 'Staten Island', 'Neighborhoods': 'Stapleton, Port Richmond'},
     {'Precinct': '122', 'Borough': 'Staten Island', 'Neighborhoods': 'New Springville, South Beach'},
     {'Precinct': '123', 'Borough': 'Staten Island', 'Neighborhoods': 'Tottenville, Woodrow, Great Kills'} ]
-
+def convert_to_csv(xlsx_file):
+    read_file = pd.read_excel(xlsx_file, skiprows=11)
+    csv_file = xlsx_file.replace('.xlsx', '.csv')
+    read_file.to_csv(csv_file, index=True, header=True)
+    df = pd.DataFrame(pd.read_csv(csv_file))
+    
 def download_Weekly_files():
     for data in precinct_data:
         precinct = int(data['Precinct'])
@@ -95,6 +100,7 @@ def download_Weekly_files():
             
         base_url = f'https://www.nyc.gov/assets/nypd/downloads/excel/crime_statistics/cs-en-us-{formatted_precinct}pct.xlsx'
         file_name = f'crime_stats_{formatted_precinct}pct.xlsx'
+        convert_to_csv(file_name)
         try:
             response = requests.get(base_url)
             if response.status_code == 200:
@@ -106,14 +112,11 @@ def download_Weekly_files():
         except requests.RequestException as e:
             print(f"Error downloading {file_name}: {str(e)}")
 
-def convert_to_csv(xlsx_file):
-    read_file = pd.read_excel(xlsx_file, skiprows=11)
-    csv_file = xlsx_file.replace('.xlsx', '.csv')
-    read_file.to_csv(csv_file, index=True, header=True)
-    df = pd.DataFrame(pd.read_csv(csv_file))
-
+# used to download weekly files from the NYPD website
+# download_Weekly_files()
 def read_csv_andProcess(csv_file):
     df_first_part = pd.read_csv(csv_file, nrows=22, header=None)
+    #stores historical data
     df_historical_data = pd.read_csv(csv_file, skiprows=22, header=None)
     df_first_part.columns = [
         'Index', 'Crime Type', 'Unnamed_1', 'Week to Date*', 'Unnamed_3','Unnamed_4',
@@ -124,21 +127,23 @@ def read_csv_andProcess(csv_file):
     stats = df_first_part[df_first_part['Crime Type'] == 'TOTAL']
 
     if not stats.empty:
+        #stats to date
         stat_week_to_date = stats['Week to Date*'].values[0]
         # print(f"Total crime statistic for Week to Date*: {stat_week_to_date}")
     else:
         # print("statistics not found in the data.")
         print('test')
     return stats
-    
+ 
 def process_precinct_data(precinct_data):
     borough_totals = {}
+    neighborhood_totals = {}
     precinct_crime_totals = {}  # Dictionary to store crime totals per precinct
     precinct_geojson = 'Police Precincts.geojson'
     gdf_precincts = gpd.read_file(precinct_geojson)
+    
     for data in precinct_data:
         precinct = int(data['Precinct'])
-
         if precinct > 99:
             formatted_precinct = str(precinct)
         elif precinct > 9:
@@ -147,62 +152,68 @@ def process_precinct_data(precinct_data):
             formatted_precinct = f"00{precinct}"
 
         csv_file = f'crime_stats_{formatted_precinct}pct.csv'
-
         week_to_date_stat = read_csv_andProcess(csv_file)
 
         if week_to_date_stat is not None:
             # Accumulate the week-to-date statistic to precinct total
             precinct_crime_totals[formatted_precinct] = int(week_to_date_stat['Week to Date*'].values[0])
 
-            # Accumulate the week-to-date statistic to borough total
+            # Accumulate the week-to-date statistic to neighborhood and borough total
+            neighborhood = data['Neighborhoods']
+            if neighborhood not in neighborhood_totals:
+                neighborhood_totals[neighborhood] = 0
+            neighborhood_totals[neighborhood] += int(week_to_date_stat['Week to Date*'].values[0])
             borough = data['Borough']
             if borough not in borough_totals:
                 borough_totals[borough] = 0
             borough_totals[borough] += int(week_to_date_stat['Week to Date*'].values[0])
        
-        df_precinct_data = pd.DataFrame(precinct_data)
+    df_precinct_data = pd.DataFrame(precinct_data)
+    df_precinct_data['Precinct'] = df_precinct_data['Precinct'].astype(str)
+    if 'precinct' in gdf_precincts.columns:
+        gdf_precincts['precinct'] = gdf_precincts['precinct'].astype(str)
+    merged_gdf = gdf_precincts.merge(df_precinct_data, left_on='precinct', right_on='Precinct', how='left')
+    
+    df_neighborhood_totals = pd.DataFrame(list(neighborhood_totals.items()), columns=['Neighborhoods', 'Total_Crimes'])
+    min_crimes = df_neighborhood_totals['Total_Crimes'].min()
+    max_crimes = df_neighborhood_totals['Total_Crimes'].max()
+    df_neighborhood_totals['Safety_Score'] = df_neighborhood_totals['Total_Crimes'].apply(
+        lambda x: 1 - ((x - min_crimes) / (max_crimes - min_crimes))
+    )
+    
+    # Add the Safety_Score to the merged_gdf
+    merged_gdf = merged_gdf.merge(df_neighborhood_totals, on='Neighborhoods', how='left')
+    
+    for precinct, total_crimes in precinct_crime_totals.items():
+        precinct_num = int(precinct)
+        merged_gdf.loc[merged_gdf['precinct'] == f'{precinct_num}', 'Precinct_Total_Crimes'] = total_crimes
+    
+    return merged_gdf, df_neighborhood_totals
 
-    # print("\nPrecinct-wise total crime statistics last week:")
-        df_precinct_data['Precinct'] = df_precinct_data['Precinct'].astype(str)
-        if 'precinct' in gdf_precincts.columns:
-            gdf_precincts['precinct'] = gdf_precincts['precinct'].astype(str)
-        merged_gdf = gdf_precincts.merge(df_precinct_data, left_on='precinct', right_on='Precinct', how='left')
+def generate_map(precinct_data):
+    merged_gdf, df_neighborhood_totals = process_precinct_data(precinct_data)
+
+    fig, ax = plt.subplots(1, 1, figsize=(30, 15))
+    merged_gdf.plot(column='Precinct_Total_Crimes', ax=ax, legend=True, cmap='OrRd',
+                    legend_kwds={'label': "Total Crimes by Precinct",
+                                 'orientation': "horizontal"})
+
+    for x, y, label, score in zip(merged_gdf.geometry.centroid.x, 
+                                  merged_gdf.geometry.centroid.y, 
+                                  merged_gdf['Neighborhoods'],
+                                  merged_gdf['Safety_Score']):
         
-        # print(precinct_crime_totals[formatted_precinct])
-        # precinct_crime_totals[formatted_precinct]
-        # for borough, total_crimes in precinct_crime_totals.items():
-        #     print(f'{precinct} {total_crimes}')
-        # print(f"Processed crime stats for {data['Borough']} - {data['Neighborhoods']} precinct {formatted_precinct} ")
-    
-        print(precinct_crime_totals[formatted_precinct])
-        # print(merged_gdf['Borough'] == borough) 
-        print(precinct)
-        merged_gdf.loc[merged_gdf['precinct'] == f'{precinct}', 'Precinct_Total_Crimes'] = 1 #precinct_crime_totals[formatted_precinct]
+        ax.text(x, y, label, fontsize=5, ha='center', va='center')
+        ax.text(x, y - 0.01, f'Score: {score:.2f}', fontsize=5, ha='center', va='center', color='blue')
+
+    plt.title('Crime Saturation by Precinct')
+    plt.axis('off')
+    plt.show()
 
 
-    print(merged_gdf.head())
-    # for precinct, total_crimes in precinct_crime_totals.items():
-        # print(f"Precinct {precinct}: {total_crimes} Total Crimes")
-        # total crimes in this contect refers to per precinct
-        
-    
 
-    # print("\nBorough-wise total crime statistics last week:")
-    # for borough, total in borough_totals.items():
-    #     print(f"{borough}: {total} Total Crimes")
-    
-
-
-    
-
-    
-
-
-    # borough_totals = process_precinct_data(precinct_data)
-
-    
-    
-    return borough_totals
-
-
-process_precinct_data(precinct_data)
+# def generate_safety_scores()
+# generate_map(precinct_data)
+# df_neighborhood_totals = process_precinct_data(precinct_data)
+generate_map(precinct_data)
+# print(df_neighborhood_totals['Safety_Score'])
