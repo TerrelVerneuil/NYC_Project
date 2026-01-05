@@ -1,26 +1,35 @@
 {
   "name": "nyc_project",
   "version": "1.0.0",
-   "scripts": {
+  "type": "module",
+  "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "npx vite build",
+    "preview": "vite preview"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TerrelVerneuil/NYC_Project.git"
   },
-  "keywords": [],
+  "keywords": [
+    "threejs",
+    "nyc",
+    "crime",
+    "visualization"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/TerrelVerneuil/NYC_Project/issues"
   },
   "homepage": "https://github.com/TerrelVerneuil/NYC_Project#readme",
-  "description": "",
+  "description": "3D visualization of NYC crime data",
   "dependencies": {
     "gsap": "^3.14.2",
     "lil-gui": "^0.21.0",
-    "three": "^0.182.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
     "vite": "^7.3.0"
   }
 }
