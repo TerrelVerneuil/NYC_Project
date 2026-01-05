@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Crime Intelligence - 3D ZIP Map</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #05050f;
+        }
+        
+        .webgl { position: fixed; top: 0; left: 0; outline: none; }
+
+    </style>
+</head>
+<body>
+    <canvas class="webgl"></canvas>
+    
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Streaming NYPD Crime Intelligence...</p>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="zipSearch" placeholder="Search ZIP (e.g. 10001)...">
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+        <h2 id="poName">Select an Area</h2>
+        <p><strong>ZIP Code</strong> <span class="info-value" id="zipCode">---</span></p>
+        <p><strong>Borough</strong> <span class="info-value" id="borough">---</span></p>
+        <p><strong>7-Day Incidents</strong> <span class="info-value" id="crimeCount">---</span></p>
+        <p><strong>Precinct</strong> <span class="info-value" id="precinctNum">---</span></p>
+        
+        <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="text-align: left;">
+                <span style="font-size: 10px; color: rgba(255,255,255,0.5); display: block;">SAFETY INDEX</span>
+                <span id="safetyLabel" style="font-size: 12px; font-weight: bold; color: #87CEEB;">ANALYZING...</span>
+            </div>
+            <div id="safetyScore">--%</div>
+        </div>
+
+        <div id="crimeTypes"></div>
+    </div>
+
+ 
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background: #00ff00;"></div> High Safety</div>
+        <div class="legend-item"><div class="legend-color" style="background: #ffff00;"></div> Moderate</div>
+        <div class="legend-item"><div class="legend-color" style="background: #ff0000;"></div> High Risk</div>
+        <p style="opacity: 0.5; margin-top: 8px;">Verticality = Crime Severity</p>
+    </div>
+
+    <script type="module" src="./script.js"></script>
+</body>
+</html>

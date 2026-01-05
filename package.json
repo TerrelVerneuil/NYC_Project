@@ -1,0 +1,26 @@
+{
+  "name": "nyc_project",
+  "version": "1.0.0",
+   "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TerrelVerneuil/NYC_Project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TerrelVerneuil/NYC_Project/issues"
+  },
+  "homepage": "https://github.com/TerrelVerneuil/NYC_Project#readme",
+  "description": "",
+  "dependencies": {
+    "gsap": "^3.14.2",
+    "lil-gui": "^0.21.0",
+    "three": "^0.182.0",
+    "vite": "^7.3.0"
+  }
+}
